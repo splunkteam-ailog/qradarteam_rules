@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rule>
+  <name>WIN - Security Event Log Cleared</name>
+  <type>EventRule</type>
+  <enabled>true</enabled>
+  <notes>
+    Detects clearing of Windows Security Event Log.
+    Critical indicator of attacker covering tracks.
+    MITRE ATT&amp;CK: T1070.001 - Indicator Removal: Clear Windows Event Logs
+  </notes>
+  <severity>10</severity>
+  <credibility>10</credibility>
+  <relevance>10</relevance>
+  <conditions>
+    <condition>
+      <eventId>1102</eventId>
+      <logSourceType>Microsoft Windows Security Event Log</logSourceType>
+    </condition>
+  </conditions>
+  <actions>
+    <createOffense>true</createOffense>
+    <offenseName>CRITICAL: Event Log Cleared on $HOSTNAME by $USERNAME</offenseName>
+  </actions>
+  <tags>
+    <tag>defense-evasion</tag>
+    <tag>log-clearing</tag>
+    <tag>MITRE-T1070</tag>
+  </tags>
+</rule>
