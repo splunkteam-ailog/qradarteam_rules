@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rule>
+  <name>WIN - New Service Installed</name>
+  <type>EventRule</type>
+  <enabled>true</enabled>
+  <notes>
+    Detects installation of new Windows services.
+    Common persistence and lateral movement technique.
+    MITRE ATT&amp;CK: T1543.003 - Create or Modify System Process: Windows Service
+  </notes>
+  <severity>7</severity>
+  <credibility>7</credibility>
+  <relevance>8</relevance>
+  <conditions>
+    <condition>
+      <eventId>7045</eventId>
+      <logSourceType>Microsoft Windows Security Event Log</logSourceType>
+    </condition>
+  </conditions>
+  <actions>
+    <createOffense>true</createOffense>
+    <offenseName>Persistence: New Service Installed on $HOSTNAME - $SERVICENAME</offenseName>
+  </actions>
+  <tags>
+    <tag>persistence</tag>
+    <tag>service-installation</tag>
+    <tag>MITRE-T1543</tag>
+  </tags>
+</rule>
