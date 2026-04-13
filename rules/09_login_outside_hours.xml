@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rule>
+  <name>WIN - Login Outside Business Hours</name>
+  <type>EventRule</type>
+  <enabled>true</enabled>
+  <notes>
+    Detects successful logins outside normal business hours (20:00-08:00).
+    May indicate unauthorized access or compromised account.
+    MITRE ATT&amp;CK: T1078 - Valid Accounts
+  </notes>
+  <severity>6</severity>
+  <credibility>6</credibility>
+  <relevance>7</relevance>
+  <conditions>
+    <condition>
+      <eventId>4624</eventId>
+      <logSourceType>Microsoft Windows Security Event Log</logSourceType>
+      <timeFilter>
+        <startTime>20:00</startTime>
+        <endTime>08:00</endTime>
+        <timezone>UTC</timezone>
+      </timeFilter>
+      <filter>
+        <field>LogonType</field>
+        <operator>IN</operator>
+        <value>2,10</value>
+      </filter>
+    </condition>
+  </conditions>
+  <actions>
+    <createOffense>true</createOffense>
+    <offenseName>Suspicious: After-Hours Login by $USERNAME from $SOURCEIP</offenseName>
+  </actions>
+  <tags>
+    <tag>anomalous-activity</tag>
+    <tag>initial-access</tag>
+    <tag>MITRE-T1078</tag>
+  </tags>
+</rule>
