@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rule>
+  <name>WIN - Audit Policy Modified</name>
+  <type>EventRule</type>
+  <enabled>true</enabled>
+  <notes>
+    Detects modification of Windows audit policies.
+    Attackers disable auditing to avoid detection.
+    MITRE ATT&amp;CK: T1562.002 - Impair Defenses: Disable Windows Event Logging
+  </notes>
+  <severity>8</severity>
+  <credibility>9</credibility>
+  <relevance>8</relevance>
+  <conditions>
+    <condition>
+      <eventId>4719</eventId>
+      <logSourceType>Microsoft Windows Security Event Log</logSourceType>
+    </condition>
+  </conditions>
+  <actions>
+    <createOffense>true</createOffense>
+    <offenseName>Defense Evasion: Audit Policy Changed on $HOSTNAME by $USERNAME</offenseName>
+  </actions>
+  <tags>
+    <tag>defense-evasion</tag>
+    <tag>audit-policy</tag>
+    <tag>MITRE-T1562</tag>
+  </tags>
+</rule>
