@@ -1,7 +1,8 @@
 import requests
 import os
 import json
-import xml.etree.ElementTree as ET
+import zipfile
+import io
 import urllib3
 urllib3.disable_warnings()
 
@@ -13,130 +14,196 @@ GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/contents/rules"
 headers = {
     "SEC": QRADAR_TOKEN,
     "Version": "12.0",
-    "Accept": "application/json",
-    "Content-Type": "application/json"
+    "Accept": "application/json"
 }
 
-# Windows Event ID → QRadar QID mapping
-EVENT_ID_TO_QID = {
-    "4720": 5000880,  # User Account Created
-    "4732": 5000895,  # Member Added to Security Group
-    "4625": 5000791,  # Logon Failure
-    "4624": 5000790,  # Logon Success
-    "4726": 5000882,  # User Account Deleted
-    "4719": 5000869,  # Audit Policy Changed
-    "7045": 5001003,  # New Service Installed
-    "1102": 5000789,  # Audit Log Cleared
-}
+# Windows EventID → QRadar Category ID mapping
+RULES_CONFIG = [
+    {
+        "filename": "01_new_user_created.xml",
+        "name": "WIN - New Local User Account Created",
+        "event_id": "4720",
+        "severity": 6,
+        "notes": "MITRE T1136 - Create Account"
+    },
+    {
+        "filename": "02_user_added_to_admins.xml",
+        "name": "WIN - User Added to Privileged Group",
+        "event_id": "4732",
+        "severity": 8,
+        "notes": "MITRE T1098 - Account Manipulation"
+    },
+    {
+        "filename": "03_brute_force.xml",
+        "name": "WIN - Brute Force Attack Detected",
+        "event_id": "4625",
+        "severity": 9,
+        "notes": "MITRE T1110 - Brute Force"
+    },
+    {
+        "filename": "04_success_after_bruteforce.xml",
+        "name": "WIN - Successful Login After Brute Force",
+        "event_id": "4624",
+        "severity": 10,
+        "notes": "MITRE T1110 - Brute Force Success"
+    },
+    {
+        "filename": "05_user_account_deleted.xml",
+        "name": "WIN - User Account Deleted",
+        "event_id": "4726",
+        "severity": 7,
+        "notes": "MITRE T1531 - Account Access Removal"
+    },
+    {
+        "filename": "06_audit_policy_changed.xml",
+        "name": "WIN - Audit Policy Modified",
+        "event_id": "4719",
+        "severity": 8,
+        "notes": "MITRE T1562 - Impair Defenses"
+    },
+    {
+        "filename": "07_new_service_installed.xml",
+        "name": "WIN - New Service Installed",
+        "event_id": "7045",
+        "severity": 7,
+        "notes": "MITRE T1543 - Create System Process"
+    },
+    {
+        "filename": "08_event_log_cleared.xml",
+        "name": "WIN - Security Event Log Cleared",
+        "event_id": "1102",
+        "severity": 10,
+        "notes": "MITRE T1070 - Indicator Removal"
+    },
+    {
+        "filename": "09_login_outside_hours.xml",
+        "name": "WIN - Login Outside Business Hours",
+        "event_id": "4624",
+        "severity": 6,
+        "notes": "MITRE T1078 - Valid Accounts"
+    },
+    {
+        "filename": "10_lateral_movement.xml",
+        "name": "WIN - Lateral Movement Detected",
+        "event_id": "4624",
+        "severity": 9,
+        "notes": "MITRE T1021 - Remote Services"
+    }
+]
 
-def get_rules_from_github():
-    """Скачать XML rules из GitHub"""
-    response = requests.get(GITHUB_API)
-    if response.status_code != 200:
-        print(f"❌ GitHub API error: {response.status_code}")
-        return []
+def build_rule_xml(rule):
+    """Создать XML в формате QRadar Extension"""
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<rule id="-1" name="{rule['name']}" owner="admin" type="EVENT" enabled="true">
+  <notes>{rule['notes']}</notes>
+  <testDefinitions>
+    <testDefinition name="EVENT" id="-1">
+      <testGroup uid="1" groupop="AND">
+        <test id="1" name="when the event QID is contained in the following list"
+              uid="1" override_id="15000" enabled="true"
+              requiredCapabilities="">
+          <parameter name="QIDList" id="1"
+                     type="STRING"
+                     value="{rule['event_id']}"
+                     operator="CONTAINEDIN"/>
+        </test>
+      </testGroup>
+    </testDefinition>
+  </testDefinitions>
+  <actions>
+    <action type="NEWEVENT" enabled="true">
+      <actionElement name="credibility" value="{min(rule['severity'], 10)}"/>
+      <actionElement name="severity" value="{rule['severity']}"/>
+      <actionElement name="relevance" value="{min(rule['severity'], 10)}"/>
+    </action>
+  </actions>
+  <responses>
+    <response type="OFFENSE" enabled="true">
+      <responseElement name="offenseMapping" value="SOURCE_IP"/>
+    </response>
+  </responses>
+</rule>"""
 
-    rules = []
-    for file in response.json():
-        if file["name"].endswith(".xml"):
-            content = requests.get(file["download_url"])
-            rules.append({
-                "name": file["name"],
-                "content": content.text
-            })
-            print(f"📥 Получено: {file['name']}")
-    return rules
+def build_manifest(rules):
+    """Создать manifest.xml для Extension ZIP"""
+    rule_entries = "\n".join([
+        f'  <content type="RULE" name="{r["name"]}" ' 
+        f'file="rules/{r["filename"]}"/>'
+        for r in rules
+    ])
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <name>QRadar Team Rules</name>
+  <version>1.0</version>
+  <author>splunkteam-ailog</author>
+  <description>10 Custom Windows Security Rules - MITRE ATT&amp;CK</description>
+  <contents>
+{rule_entries}
+  </contents>
+</manifest>"""
 
-def parse_xml_to_qradar(xml_content):
-    """Конвертировать наш XML в формат QRadar"""
-    try:
-        root = ET.fromstring(xml_content)
+def create_extension_zip(rules):
+    """Создать ZIP файл в формате QRadar Extension"""
+    zip_buffer = io.BytesIO()
 
-        name = root.findtext("name", "Unknown Rule")
-        severity = int(root.findtext("severity", "5"))
-        credibility = int(root.findtext("credibility", "5"))
-        relevance = int(root.findtext("relevance", "5"))
-        notes = root.findtext("notes", "")
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+        # Добавить manifest
+        manifest = build_manifest(rules)
+        zf.writestr("manifest.xml", manifest)
+        print("📄 manifest.xml создан")
 
-        # Получить event ID из conditions
-        event_id = root.findtext(".//eventId", "")
-        qid = EVENT_ID_TO_QID.get(event_id)
+        # Добавить каждый rule
+        for rule in rules:
+            rule_xml = build_rule_xml(rule)
+            zf.writestr(f"rules/{rule['filename']}", rule_xml)
+            print(f"📄 rules/{rule['filename']} добавлен")
 
-        # Получить threshold если есть
-        threshold_count = root.findtext(".//count")
-        threshold_time = root.findtext(".//timeInterval")
+    zip_buffer.seek(0)
+    return zip_buffer.read()
 
-        # Построить test group для QRadar
-        tests = []
+def upload_extension_to_qradar(zip_data):
+    """Загрузить Extension ZIP в QRadar"""
+    url = f"https://{QRADAR_IP}/api/config/extension_management/extensions"
 
-        if qid:
-            tests.append({
-                "uid": 1,
-                "name": "when the event QID is one of the following QIDs",
-                "override_id": 15000,
-                "enabled": True,
-                "parameters": [
-                    {
-                        "parameter_name": "QIDList",
-                        "value": str(qid)
-                    }
-                ]
-            })
+    upload_headers = {
+        "SEC": QRADAR_TOKEN,
+        "Version": "12.0",
+        "Accept": "application/json"
+    }
 
-        if threshold_count and threshold_time:
-            tests.append({
-                "uid": 2,
-                "name": "an event matches any of the following rules more than N times",
-                "override_id": 15001,
-                "enabled": True,
-                "parameters": [
-                    {
-                        "parameter_name": "count",
-                        "value": threshold_count
-                    },
-                    {
-                        "parameter_name": "timeInterval",
-                        "value": threshold_time
-                    }
-                ]
-            })
+    files = {
+        "file": ("qradar_rules.zip", zip_data, "application/zip")
+    }
 
-        rule = {
-            "name": name,
-            "type": "EVENT",
-            "enabled": True,
-            "owner": "admin",
-            "origin": "USER",
-            "notes": notes,
-            "groups": ["Windows"],
-            "average_capacity": 0,
-            "base_capacity": 0,
-            "base_host_id": 0,
-            "capacity_timestamp": 0,
-            "creation_date": None,
-            "identifier": name.replace(" ", "_").replace("-", "_").lower(),
-        }
+    print("\n⬆️  Загружаем Extension в QRadar...")
+    r = requests.post(
+        url,
+        headers=upload_headers,
+        files=files,
+        verify=False
+    )
+    return r.status_code, r.json() if r.text else {}
 
-        return rule
+def install_extension(extension_id):
+    """Установить загруженный Extension"""
+    url = f"https://{QRADAR_IP}/api/config/extension_management/extensions/{extension_id}"
 
-    except ET.ParseError as e:
-        print(f"❌ XML Parse Error: {e}")
-        return None
+    install_headers = {
+        "SEC": QRADAR_TOKEN,
+        "Version": "12.0",
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    }
 
-def rule_exists(name):
-    """Проверить что rule с таким именем уже существует"""
-    url = f"https://{QRADAR_IP}/api/analytics/rules"
-    params = {"filter": f'name="{name}"'}
-    r = requests.get(url, headers=headers, params=params, verify=False)
-    if r.status_code == 200 and len(r.json()) > 0:
-        return True
-    return False
+    body = {"action": "INSTALL", "overwrite": True}
 
-def create_rule_in_qradar(rule_data):
-    """Создать rule в QRadar через API"""
-    url = f"https://{QRADAR_IP}/api/analytics/rules"
-    r = requests.post(url, headers=headers, json=rule_data, verify=False)
-    return r.status_code, r.text
+    r = requests.post(
+        url,
+        headers=install_headers,
+        json=body,
+        verify=False
+    )
+    return r.status_code, r.json() if r.text else {}
 
 def add_close_reasons():
     """Добавить True-Positive и False-Positive"""
@@ -155,75 +222,57 @@ def add_close_reasons():
             print(f"⚠️  Already exists: {reason}")
 
 def check_connection():
-    """Проверить подключение к QRadar"""
     url = f"https://{QRADAR_IP}/api/system/about"
     r = requests.get(url, headers=headers, verify=False)
     if r.status_code == 200:
         info = r.json()
         print(f"✅ Connected to QRadar {info.get('external_version', '')}")
         return True
-    else:
-        print(f"❌ Connection failed: {r.status_code}")
-        return False
+    print(f"❌ Connection failed: {r.status_code}")
+    return False
 
 def main():
     print("=" * 50)
-    print("🚀 QRadar Rules Deployment from GitHub")
+    print("🚀 QRadar Rules Deployment via Extension ZIP")
     print("=" * 50)
 
     if not QRADAR_IP or not QRADAR_TOKEN:
         print("❌ Missing QRADAR_IP or QRADAR_TOKEN!")
         exit(1)
 
-    # Проверка подключения
     if not check_connection():
         exit(1)
 
-    # Скачать rules из GitHub
-    print("\n📋 Fetching rules from GitHub...")
-    xml_rules = get_rules_from_github()
-    print(f"Found {len(xml_rules)} rules\n")
+    # Создать ZIP
+    print("\n📦 Создаём Extension ZIP...")
+    zip_data = create_extension_zip(RULES_CONFIG)
+    print(f"✅ ZIP создан ({len(zip_data)} bytes)")
 
-    success = 0
-    failed = 0
-    skipped = 0
+    # Загрузить в QRadar
+    status, response = upload_extension_to_qradar(zip_data)
+    print(f"Upload status: {status}")
+    print(f"Response: {json.dumps(response, indent=2)[:300]}")
 
-    for xml_rule in xml_rules:
-        # Конвертировать XML → QRadar JSON
-        rule_data = parse_xml_to_qradar(xml_rule["content"])
+    if status in [200, 201]:
+        extension_id = response.get("id")
+        print(f"✅ Extension загружен, ID: {extension_id}")
 
-        if not rule_data:
-            print(f"❌ Parse failed: {xml_rule['name']}")
-            failed += 1
-            continue
+        # Установить
+        if extension_id:
+            inst_status, inst_response = install_extension(extension_id)
+            if inst_status in [200, 201]:
+                print(f"✅ Extension установлен!")
+            else:
+                print(f"❌ Install failed [{inst_status}]: {inst_response}")
+    else:
+        print(f"❌ Upload failed [{status}]")
 
-        # Проверить существует ли rule
-        if rule_exists(rule_data["name"]):
-            print(f"⏭️  Already exists: {rule_data['name']}")
-            skipped += 1
-            continue
-
-        # Создать rule в QRadar
-        status, response = create_rule_in_qradar(rule_data)
-
-        if status in [200, 201]:
-            print(f"✅ Created: {rule_data['name']}")
-            success += 1
-        else:
-            print(f"❌ Failed [{status}]: {rule_data['name']}")
-            print(f"   Response: {response[:200]}")
-            failed += 1
-
-    # Добавить close reasons
+    # Close reasons
     print("\n📋 Adding custom close reasons...")
     add_close_reasons()
 
-    # Итог
     print("\n" + "=" * 50)
-    print(f"✅ Created : {success}")
-    print(f"⏭️  Skipped : {skipped}")
-    print(f"❌ Failed  : {failed}")
-    print("⚠️  Click Deploy Changes in QRadar!")
+    print("⚠️  Нажми Deploy Changes в QRadar!")
     print("=" * 50)
 
 if __name__ == "__main__":
