@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rule>
+  <name>WIN - User Added to Privileged Group</name>
+  <type>EventRule</type>
+  <enabled>true</enabled>
+  <notes>
+    Detects when a user is added to Administrators or other privileged groups.
+    MITRE ATT&amp;CK: T1098 - Account Manipulation
+  </notes>
+  <severity>8</severity>
+  <credibility>9</credibility>
+  <relevance>9</relevance>
+  <conditions>
+    <condition>
+      <eventId>4732</eventId>
+      <logSourceType>Microsoft Windows Security Event Log</logSourceType>
+      <filter>
+        <field>GroupName</field>
+        <operator>CONTAINS</operator>
+        <value>Administrators</value>
+      </filter>
+    </condition>
+  </conditions>
+  <actions>
+    <createOffense>true</createOffense>
+    <offenseName>Privilege Escalation: $USERNAME added to Admins on $HOSTNAME</offenseName>
+  </actions>
+  <tags>
+    <tag>privilege-escalation</tag>
+    <tag>account-management</tag>
+    <tag>MITRE-T1098</tag>
+  </tags>
+</rule>
