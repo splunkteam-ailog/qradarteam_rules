@@ -1,0 +1,12 @@
+{
+  "custom_close_reasons": [
+    {
+      "name": "True-Positive",
+      "description": "Confirmed real attack or security incident. Escalate to IR team."
+    },
+    {
+      "name": "False-Positive",
+      "description": "Confirmed false alarm. Rule tuning may be required."
+    }
+  ]
+}
