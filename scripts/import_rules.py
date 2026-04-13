@@ -5,7 +5,7 @@ urllib3.disable_warnings()
 
 QRADAR_IP = os.environ.get("QRADAR_IP")
 QRADAR_TOKEN = os.environ.get("QRADAR_TOKEN")
-GITHUB_REPO = "твой_username/qradarteam_rules"
+GITHUB_REPO = "splunkteam-ailog/qradarteam_rules"
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/contents/rules"
 
 def get_rules_from_github():
