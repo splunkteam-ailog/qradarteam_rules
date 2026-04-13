@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rule>
+  <name>WIN - Successful Login After Brute Force</name>
+  <type>EventRule</type>
+  <enabled>true</enabled>
+  <notes>
+    Detects successful authentication following brute force activity.
+    High confidence indicator of compromised credentials.
+    MITRE ATT&amp;CK: T1110 - Brute Force
+  </notes>
+  <severity>10</severity>
+  <credibility>9</credibility>
+  <relevance>10</relevance>
+  <conditions>
+    <condition>
+      <eventId>4624</eventId>
+      <logSourceType>Microsoft Windows Security Event Log</logSourceType>
+      <correlatedRule>WIN - Brute Force Attack Detected</correlatedRule>
+      <timeWindow>600</timeWindow>
+      <groupBy>sourceIP</groupBy>
+    </condition>
+  </conditions>
+  <actions>
+    <createOffense>true</createOffense>
+    <offenseName>CRITICAL: Successful Login After BruteForce from $SOURCEIP</offenseName>
+  </actions>
+  <tags>
+    <tag>brute-force</tag>
+    <tag>initial-access</tag>
+    <tag>MITRE-T1110</tag>
+  </tags>
+</rule>
