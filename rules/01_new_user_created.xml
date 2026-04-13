@@ -1,1 +1,29 @@
-
+<?xml version="1.0" encoding="UTF-8"?>
+<rule>
+  <name>WIN - New Local User Account Created</name>
+  <type>EventRule</type>
+  <enabled>true</enabled>
+  <notes>
+    Detects creation of new local user accounts on Windows systems.
+    MITRE ATT&amp;CK: T1136.001 - Create Account: Local Account
+  </notes>
+  <severity>6</severity>
+  <credibility>8</credibility>
+  <relevance>8</relevance>
+  <conditions>
+    <condition>
+      <eventId>4720</eventId>
+      <logSourceType>Microsoft Windows Security Event Log</logSourceType>
+    </condition>
+  </conditions>
+  <actions>
+    <createOffense>true</createOffense>
+    <offenseName>New Local User Created: $USERNAME on $HOSTNAME</offenseName>
+    <emailNotification>false</emailNotification>
+  </actions>
+  <tags>
+    <tag>account-management</tag>
+    <tag>persistence</tag>
+    <tag>MITRE-T1136</tag>
+  </tags>
+</rule>
