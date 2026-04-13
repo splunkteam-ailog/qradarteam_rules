@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rule>
+  <name>WIN - Lateral Movement Detected</name>
+  <type>EventRule</type>
+  <enabled>true</enabled>
+  <notes>
+    Detects single source IP authenticating to 5+ different hosts within 5 minutes.
+    Strong indicator of lateral movement activity.
+    MITRE ATT&amp;CK: T1021 - Remote Services
+  </notes>
+  <severity>9</severity>
+  <credibility>8</credibility>
+  <relevance>9</relevance>
+  <conditions>
+    <condition>
+      <eventId>4624</eventId>
+      <logSourceType>Microsoft Windows Security Event Log</logSourceType>
+      <threshold>
+        <distinctDestinations>5</distinctDestinations>
+        <timeInterval>300</timeInterval>
+        <groupBy>sourceIP</groupBy>
+      </threshold>
+      <filter>
+        <field>LogonType</field>
+        <operator>IN</operator>
+        <value>3,10</value>
+      </filter>
+    </condition>
+  </conditions>
+  <actions>
+    <createOffense>true</createOffense>
+    <offenseName>Lateral Movement: $SOURCEIP accessing multiple hosts ($COUNT hosts in 5min)</offenseName>
+  </actions>
+  <tags>
+    <tag>lateral-movement</tag>
+    <tag>remote-services</tag>
+    <tag>MITRE-T1021</tag>
+  </tags>
+</rule>
