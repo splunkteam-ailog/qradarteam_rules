@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rule>
+  <name>WIN - User Account Deleted</name>
+  <type>EventRule</type>
+  <enabled>true</enabled>
+  <notes>
+    Detects deletion of user accounts which may indicate
+    covering tracks after compromise.
+    MITRE ATT&amp;CK: T1531 - Account Access Removal
+  </notes>
+  <severity>7</severity>
+  <credibility>8</credibility>
+  <relevance>7</relevance>
+  <conditions>
+    <condition>
+      <eventId>4726</eventId>
+      <logSourceType>Microsoft Windows Security Event Log</logSourceType>
+    </condition>
+  </conditions>
+  <actions>
+    <createOffense>true</createOffense>
+    <offenseName>User Account Deleted: $USERNAME by $ADMIN on $HOSTNAME</offenseName>
+  </actions>
+  <tags>
+    <tag>account-management</tag>
+    <tag>defense-evasion</tag>
+    <tag>MITRE-T1531</tag>
+  </tags>
+</rule>
