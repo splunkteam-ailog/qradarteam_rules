@@ -4,27 +4,17 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch: 
-    paths:
-      - 'rules/**.xml'
-      - 'close_reasons/**.json'
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-
-      - name: Install dependencies
-        run: pip install requests
-
+          python-version: '3.12'
+      - run: pip install requests
       - name: Deploy rules to QRadar
         env:
           QRADAR_IP: ${{ secrets.QRADAR_IP }}
