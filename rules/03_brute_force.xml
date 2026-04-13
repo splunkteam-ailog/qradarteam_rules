@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rule>
+  <name>WIN - Brute Force Attack Detected</name>
+  <type>EventRule</type>
+  <enabled>true</enabled>
+  <notes>
+    Detects multiple failed login attempts from same source IP within 60 seconds.
+    Threshold: 10 failures in 60 seconds.
+    MITRE ATT&amp;CK: T1110 - Brute Force
+  </notes>
+  <severity>9</severity>
+  <credibility>8</credibility>
+  <relevance>9</relevance>
+  <conditions>
+    <condition>
+      <eventId>4625</eventId>
+      <logSourceType>Microsoft Windows Security Event Log</logSourceType>
+      <threshold>
+        <count>10</count>
+        <timeInterval>60</timeInterval>
+        <groupBy>sourceIP</groupBy>
+      </threshold>
+    </condition>
+  </conditions>
+  <actions>
+    <createOffense>true</createOffense>
+    <offenseName>Brute Force Attack from $SOURCEIP targeting $HOSTNAME</offenseName>
+  </actions>
+  <tags>
+    <tag>brute-force</tag>
+    <tag>credential-access</tag>
+    <tag>MITRE-T1110</tag>
+  </tags>
+</rule>
