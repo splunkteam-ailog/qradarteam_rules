@@ -19,4 +19,5 @@ jobs:
         env:
           QRADAR_IP: ${{ secrets.QRADAR_IP }}
           QRADAR_TOKEN: ${{ secrets.QRADAR_TOKEN }}
+          GITHUBTOKEN: ${{ secrets.GITHUBTOKEN }}
         run: python scripts/import_rules.py
