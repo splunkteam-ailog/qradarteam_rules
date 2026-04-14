@@ -1,9 +1,9 @@
 import requests
 import os
-import json
+import base64
 import zipfile
 import io
-import base64
+import json
 import urllib3
 urllib3.disable_warnings()
 
@@ -26,175 +26,205 @@ github_headers = {
 
 RULES = [
     {
-        "id": 1,
-        "filename": "01_new_user_created.xml",
         "name": "WIN - New Local User Account Created",
-        "notes": "MITRE T1136 - Detects creation of new local user accounts. EventID 4720",
+        "notes": "MITRE T1136 - New user account created. EventID 4720",
+        "event_name": "User Account Created",
         "severity": 6,
         "credibility": 8,
         "relevance": 8,
-        "qid": "5000880",
+        "low_level_category": 4015,
     },
     {
-        "id": 2,
-        "filename": "02_user_added_to_admins.xml",
         "name": "WIN - User Added to Privileged Group",
         "notes": "MITRE T1098 - User added to Administrators group. EventID 4732",
+        "event_name": "User Added to Security Group",
         "severity": 8,
         "credibility": 9,
         "relevance": 9,
-        "qid": "5000895",
+        "low_level_category": 4015,
     },
     {
-        "id": 3,
-        "filename": "03_brute_force.xml",
         "name": "WIN - Brute Force Attack Detected",
-        "notes": "MITRE T1110 - Multiple failed logins from same IP. EventID 4625",
+        "notes": "MITRE T1110 - Multiple failed logins. EventID 4625",
+        "event_name": "Brute Force Login",
         "severity": 9,
         "credibility": 8,
         "relevance": 9,
-        "qid": "5000791",
+        "low_level_category": 4002,
     },
     {
-        "id": 4,
-        "filename": "04_success_after_bruteforce.xml",
         "name": "WIN - Successful Login After Brute Force",
-        "notes": "MITRE T1110 - Successful login following brute force. EventID 4624",
+        "notes": "MITRE T1110 - Successful login after brute force. EventID 4624",
+        "event_name": "Login After Brute Force",
         "severity": 10,
         "credibility": 9,
         "relevance": 10,
-        "qid": "5000790",
+        "low_level_category": 4002,
     },
     {
-        "id": 5,
-        "filename": "05_user_account_deleted.xml",
         "name": "WIN - User Account Deleted",
-        "notes": "MITRE T1531 - User account deletion detected. EventID 4726",
+        "notes": "MITRE T1531 - User account deleted. EventID 4726",
+        "event_name": "User Account Deleted",
         "severity": 7,
         "credibility": 8,
         "relevance": 7,
-        "qid": "5000882",
+        "low_level_category": 4015,
     },
     {
-        "id": 6,
-        "filename": "06_audit_policy_changed.xml",
         "name": "WIN - Audit Policy Modified",
-        "notes": "MITRE T1562 - Audit policy modification detected. EventID 4719",
+        "notes": "MITRE T1562 - Audit policy changed. EventID 4719",
+        "event_name": "Audit Policy Changed",
         "severity": 8,
         "credibility": 9,
         "relevance": 8,
-        "qid": "5000869",
+        "low_level_category": 4019,
     },
     {
-        "id": 7,
-        "filename": "07_new_service_installed.xml",
         "name": "WIN - New Service Installed",
-        "notes": "MITRE T1543 - New Windows service installation. EventID 7045",
+        "notes": "MITRE T1543 - New service installed. EventID 7045",
+        "event_name": "New Service Installed",
         "severity": 7,
         "credibility": 7,
         "relevance": 8,
-        "qid": "5001003",
+        "low_level_category": 4019,
     },
     {
-        "id": 8,
-        "filename": "08_event_log_cleared.xml",
         "name": "WIN - Security Event Log Cleared",
-        "notes": "MITRE T1070 - Security event log was cleared. EventID 1102",
+        "notes": "MITRE T1070 - Event log cleared. EventID 1102",
+        "event_name": "Event Log Cleared",
         "severity": 10,
         "credibility": 10,
         "relevance": 10,
-        "qid": "5000789",
+        "low_level_category": 4019,
     },
     {
-        "id": 9,
-        "filename": "09_login_outside_hours.xml",
         "name": "WIN - Login Outside Business Hours",
-        "notes": "MITRE T1078 - Login detected outside business hours. EventID 4624",
+        "notes": "MITRE T1078 - Login outside hours. EventID 4624",
+        "event_name": "After Hours Login",
         "severity": 6,
         "credibility": 6,
         "relevance": 7,
-        "qid": "5000790",
+        "low_level_category": 4002,
     },
     {
-        "id": 10,
-        "filename": "10_lateral_movement.xml",
         "name": "WIN - Lateral Movement Detected",
-        "notes": "MITRE T1021 - Single IP accessing multiple hosts. EventID 4624",
+        "notes": "MITRE T1021 - Lateral movement. EventID 4624",
+        "event_name": "Lateral Movement",
         "severity": 9,
         "credibility": 8,
         "relevance": 9,
-        "qid": "5000790",
+        "low_level_category": 4002,
     }
 ]
 
-def build_rule_xml(rule):
-    return f"""<?xml version="1.0" encoding="UTF-8"?>
-<rule name="{rule['name']}" id="-1" type="EVENT" enabled="true" owner="admin"
-      origin="USER" base_capacity="0" base_host_id="0"
-      average_capacity="0" capacity_timestamp="0">
-  <notes>{rule['notes']}</notes>
-  <groups>
-    <group name="Windows" />
-  </groups>
-  <testDefinitions>
-    <testGroup uid="1" groupop="AND">
-      <test id="1" uid="1" override_id="15000" enabled="true"
-            name="when the event QID is contained in the following list"
-            requiredCapabilities="">
-        <parameter name="QIDList" id="1" type="STRING"
-                   value="{rule['qid']}" operator="CONTAINEDIN"/>
-      </test>
-    </testGroup>
-  </testDefinitions>
-  <actions>
-    <action type="SETPROPERTY" enabled="true">
-      <parameter name="credibility" value="{rule['credibility']}"/>
-      <parameter name="severity" value="{rule['severity']}"/>
-      <parameter name="relevance" value="{rule['relevance']}"/>
-    </action>
-    <action type="OFFENSE" enabled="true">
-      <parameter name="offensemapping" value="SOURCE_IP"/>
-      <parameter name="offensename" value="{rule['name']}"/>
-    </action>
-  </actions>
-</rule>"""
+def get_or_create_qid(rule):
+    """Найти или создать QID для rule"""
+    url = f"https://{QRADAR_IP}/api/data_classification/qid_records"
+    params = {
+        "filter": f'name="{rule["event_name"]}"',
+        "Range": "0-5"
+    }
+    r = requests.get(url, headers=qradar_headers, params=params, verify=False)
 
-def build_manifest():
-    contents = "\n".join([
-        f'    <content type="CUSTOM_RULE" name="{r["name"]}" '
-        f'file="rules/{r["filename"]}"/>'
-        for r in RULES
-    ])
-    return f"""<?xml version="1.0" encoding="UTF-8"?>
-<manifest>
-  <name>QRadarTeam Windows Security Rules</name>
-  <version>1.0</version>
-  <author>splunkteam-ailog</author>
-  <description>10 Custom Windows Security Detection Rules - MITRE ATT&amp;CK</description>
-  <contents>
-{contents}
-  </contents>
-</manifest>"""
+    if r.status_code == 200 and r.json():
+        qid = r.json()[0]["qid"]
+        print(f"  📌 Found QID {qid} for: {rule['event_name']}")
+        return qid
 
-def create_zip():
-    print("\n📦 Создаём Extension ZIP...")
+    # Создать новый QID
+    create_url = f"https://{QRADAR_IP}/api/data_classification/qid_records"
+    create_headers = {
+        "SEC": QRADAR_TOKEN,
+        "Version": "12.0",
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "name": rule["event_name"],
+        "description": rule["notes"],
+        "severity": rule["severity"],
+        "low_level_category_id": rule["low_level_category"]
+    }
+    r = requests.post(
+        create_url,
+        headers=create_headers,
+        json=payload,
+        verify=False
+    )
+    if r.status_code in [200, 201]:
+        qid = r.json()["qid"]
+        print(f"  ✅ Created QID {qid} for: {rule['event_name']}")
+        return qid
+    else:
+        print(f"  ⚠️  Using default QID for: {rule['event_name']}")
+        return 67500128  # fallback QID
+
+def build_inner_rule_xml(rule, qid):
+    """Создать внутренний XML rule (точный формат QRadar 7.5)"""
+    return f"""<rule id="-1" enabled="true" buildingBlock="false" roleDefinition="false" type="EVENT" scope="LOCAL" owner="admin"><name>{rule['name']}</name><notes>{rule['notes']}</notes><testDefinitions><test id="19" name="com.q1labs.semsources.cre.tests.QID_Test" uid="0" group="jsp.qradar.rulewizard.condition.page.group.event" groupId="3" requiredCapabilities="EventViewer.RULECREATION|SURVEILLANCE.RULECREATION"><text>when the event QID is one of the following QIDs</text><parameter id="1"><initialText>QIDs</initialText><selectionLabel>Browse or Search for QIDs below.</selectionLabel><userOptions format="CustomizeParameter-QID.jsp" source="class" method="com.q1labs.sem.ui.semservices.UISemServices.getQidsByLowLevelCategory" multiselect="true"/><userSelection>{qid}</userSelection><userSelectionTypes>property</userSelectionTypes><userSelectionId>{qid}</userSelectionId></parameter></test></testDefinitions><actions><alterMetric metric="setSeverity" operation="setSeverity" value="{rule['severity']}"/><alterMetric metric="setCredibility" operation="setCredibility" value="{rule['credibility']}"/><alterMetric metric="setRelevance" operation="setRelevance" value="{rule['relevance']}"/></actions><responses referenceMap="false" referenceMapOfSets="false" referenceMapOfMaps="false" referenceTable="false" referenceMapRemove="false" referenceMapOfSetsRemove="false" referenceMapOfMapsRemove="false" referenceTableRemove="false"><newevent name="{rule['name']}" description="{rule['notes']}" severity="{rule['severity']}" credibility="{rule['credibility']}" relevance="{rule['relevance']}" describeOffense="false" overrideOffenseName="false" contributeOffenseName="false" qid="{qid}" forceOffenseCreation="false" offenseMapping="0" lowLevelCategory="{rule['low_level_category']}"/></responses></rule>"""
+
+def build_content_xml(rule, qid):
+    """Создать outer XML в точном формате QRadar export"""
+    inner_xml = build_inner_rule_xml(rule, qid)
+    rule_data_b64 = base64.b64encode(inner_xml.encode("utf-8")).decode("utf-8")
+
+    return f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<content>
+    <qradarversion>2021.6.14.20251017194912</qradarversion>
+    <custom_rule>
+        <origin>USER</origin>
+        <flags>0</flags>
+        <rule_data>{rule_data_b64}</rule_data>
+        <rule_type>0</rule_type>
+        <id>-1</id>
+    </custom_rule>
+    <offense_type>
+        <database>common</database>
+        <legacy>true</legacy>
+        <nva_name>by-attacker</nva_name>
+        <composite>false</composite>
+        <custom>false</custom>
+        <name>BY_ATTACKER</name>
+        <limiter_string>ATTACKER</limiter_string>
+        <default_label>Source IP</default_label>
+        <id>0</id>
+        <property_name>sourceIP</property_name>
+    </offense_type>
+    <qidmap>
+        <severity>{rule['severity']}</severity>
+        <lowlevelcategory>{rule['low_level_category']}</lowlevelcategory>
+        <reverseip>false</reverseip>
+        <qid>{qid}</qid>
+        <ratethreshold>0</ratethreshold>
+        <rateinterval>0</rateinterval>
+        <qdescription>{rule['notes']}</qdescription>
+        <catpipename>Echo</catpipename>
+        <ratelongwindow>0</ratelongwindow>
+        <qname>{rule['name']}</qname>
+        <rateshortwindow>0</rateshortwindow>
+        <id>-1</id>
+    </qidmap>
+</content>"""
+
+def create_zip(rules_with_qids):
+    """Создать ZIP с XML файлами"""
+    print("\n📦 Создаём ZIP...")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("manifest.xml", build_manifest())
-        print("  ✅ manifest.xml")
-        for rule in RULES:
-            zf.writestr(f"rules/{rule['filename']}", build_rule_xml(rule))
-            print(f"  ✅ rules/{rule['filename']}")
+        for i, (rule, qid) in enumerate(rules_with_qids, 1):
+            filename = f"{i:02d}_{rule['name'].replace(' ', '_').replace('-', '')}.xml"
+            xml_content = build_content_xml(rule, qid)
+            zf.writestr(filename, xml_content)
+            print(f"  ✅ {filename}")
     buf.seek(0)
     data = buf.read()
     print(f"✅ ZIP создан ({len(data)} bytes)")
     return data
 
-def upload_zip_to_github(zip_data):
-    print("\n📤 Загружаем ZIP в GitHub...")
-    filename = "exports/qradar_rules.zip"
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
-
+def upload_to_github(zip_data):
+    """Загрузить ZIP в GitHub"""
+    print("\n📤 Загружаем в GitHub...")
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/exports/qradar_rules.zip"
     r = requests.get(url, headers=github_headers)
     sha = r.json().get("sha") if r.status_code == 200 else None
 
@@ -208,13 +238,12 @@ def upload_zip_to_github(zip_data):
 
     r = requests.put(url, headers=github_headers, json=payload)
     if r.status_code in [200, 201]:
-        print("✅ ZIP загружен в GitHub: exports/qradar_rules.zip")
-        return True
+        print("✅ ZIP загружен в GitHub")
     else:
-        print(f"❌ GitHub upload failed [{r.status_code}]: {r.text[:200]}")
-        return False
+        print(f"❌ GitHub error [{r.status_code}]: {r.text[:200]}")
 
-def deploy_zip_to_qradar(zip_data):
+def deploy_to_qradar(zip_data):
+    """Задеплоить ZIP в QRadar"""
     print("\n⬆️  Деплоим в QRadar...")
     url = f"https://{QRADAR_IP}/api/config/extension_management/extensions"
     upload_headers = {
@@ -231,9 +260,9 @@ def deploy_zip_to_qradar(zip_data):
         return False
 
     ext_id = r.json().get("id")
-    print(f"✅ Extension загружен, ID: {ext_id}")
+    print(f"✅ Загружен ID: {ext_id}")
 
-    install_url = f"https://{QRADAR_IP}/api/config/extension_management/extensions/{ext_id}"
+    install_url = f"{url}/{ext_id}"
     install_headers = {
         "SEC": QRADAR_TOKEN,
         "Version": "12.0",
@@ -247,21 +276,19 @@ def deploy_zip_to_qradar(zip_data):
         verify=False
     )
     if r.status_code in [200, 201]:
-        print("✅ Extension установлен в QRadar!")
+        print("✅ Extension установлен!")
         return True
     else:
         print(f"❌ Install failed [{r.status_code}]: {r.text[:300]}")
         return False
 
 def add_close_reasons():
-    print("\n📋 Adding custom close reasons...")
+    print("\n📋 Close reasons...")
     for reason in ["True-Positive", "False-Positive"]:
         url = f"https://{QRADAR_IP}/api/siem/offense_closing_reasons"
         r = requests.post(
-            url,
-            headers=qradar_headers,
-            params={"reason": reason},
-            verify=False
+            url, headers=qradar_headers,
+            params={"reason": reason}, verify=False
         )
         if r.status_code == 201:
             print(f"  ✅ Added: {reason}")
@@ -279,24 +306,36 @@ def check_connection():
 
 def main():
     print("=" * 55)
-    print("🚀 QRadar Rules: GitHub → QRadar Auto Deploy")
+    print("🚀 QRadar Rules Auto Deploy - Exact Format")
     print("=" * 55)
 
     if not QRADAR_IP or not QRADAR_TOKEN:
-        print("❌ Missing QRADAR_IP or QRADAR_TOKEN!")
+        print("❌ Missing secrets!")
         exit(1)
 
     if not check_connection():
         exit(1)
 
-    zip_data = create_zip()
-    
-    if GITHUBTOKEN:
-        upload_zip_to_github(zip_data)
-    else:
-        print("⚠️  GITHUBTOKEN не задан — пропускаем загрузку в GitHub")
+    # Получить QIDs
+    print("\n🔍 Getting QIDs...")
+    rules_with_qids = []
+    for rule in RULES:
+        qid = get_or_create_qid(rule)
+        rules_with_qids.append((rule, qid))
 
-    deploy_zip_to_qradar(zip_data)
+    # Создать ZIP
+    zip_data = create_zip(rules_with_qids)
+
+    # Загрузить в GitHub
+    if GITHUBTOKEN:
+        upload_to_github(zip_data)
+    else:
+        print("⚠️  GITHUBTOKEN не задан")
+
+    # Задеплоить в QRadar
+    deploy_to_qradar(zip_data)
+
+    # Close reasons
     add_close_reasons()
 
     print("\n" + "=" * 55)
