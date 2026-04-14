@@ -210,47 +210,21 @@ def create_zip(rules_with_qids):
     print("\n📦 Создаём правильный ZIP для QRadar...")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        # 1. Твои 10 правил
+        # 1. Твои правила
         for i, (rule, qid) in enumerate(rules_with_qids, 1):
             filename = f"{i:02d}_{rule['name'].replace(' ', '_')}.xml"
             zf.writestr(filename, build_content_xml(rule, qid))
             print(f"  ✅ Добавлено в архив: {filename}")
         
-        # 2. МАНИФЕСТ (Без него QRadar не поймет, что это единый пакет)
-        manifest = f"""<metadata>
-    <task-version>1.0</task-version>
-    <name>GitHub_Security_Pack</name>
-    <description>10 Windows Security Rules from GitHub Pipeline</description>
-    <version>1.0.0</version>
-    <author>Farhad_CyberSec</author>
-</metadata>"""
+        # 2. Ультра-простой МАНИФЕСТ (строгий формат для QRadar 7.5)
+        manifest = '<?xml version="1.0" encoding="UTF-8"?><metadata><task-version>1.0</task-version><name>GitHub_Rules_Pack</name><description>Windows Security Rules</description><version>1.0.0</version><author>GITHUB</author></metadata>'
+        
         zf.writestr("manifest.xml", manifest)
         
     buf.seek(0)
     data = buf.read()
     print(f"✅ ZIP готов к деплою ({len(data)} bytes)")
     return data
-
-def upload_to_github(zip_data):
-    """Загрузить ZIP в GitHub"""
-    print("\n📤 Загружаем в GitHub...")
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/exports/qradar_rules.zip"
-    r = requests.get(url, headers=github_headers)
-    sha = r.json().get("sha") if r.status_code == 200 else None
-
-    payload = {
-        "message": "Auto-update: QRadar rules deployment",
-        "content": base64.b64encode(zip_data).decode("utf-8"),
-        "branch": GITHUB_BRANCH
-    }
-    if sha:
-        payload["sha"] = sha
-
-    r = requests.put(url, headers=github_headers, json=payload)
-    if r.status_code in [200, 201]:
-        print("✅ ZIP загружен в GitHub")
-    else:
-        print(f"❌ GitHub error [{r.status_code}]: {r.text[:200]}")
 
 def deploy_to_qradar(zip_data):
     """Задеплоить ZIP в QRadar"""
