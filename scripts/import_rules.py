@@ -207,18 +207,28 @@ def build_content_xml(rule, qid):
 </content>"""
 
 def create_zip(rules_with_qids):
-    """Создать ZIP с XML файлами"""
-    print("\n📦 Создаём ZIP...")
+    print("\n📦 Создаём правильный ZIP для QRadar...")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        # 1. Твои 10 правил
         for i, (rule, qid) in enumerate(rules_with_qids, 1):
-            filename = f"{i:02d}_{rule['name'].replace(' ', '_').replace('-', '')}.xml"
-            xml_content = build_content_xml(rule, qid)
-            zf.writestr(filename, xml_content)
-            print(f"  ✅ {filename}")
+            filename = f"{i:02d}_{rule['name'].replace(' ', '_')}.xml"
+            zf.writestr(filename, build_content_xml(rule, qid))
+            print(f"  ✅ Добавлено в архив: {filename}")
+        
+        # 2. МАНИФЕСТ (Без него QRadar не поймет, что это единый пакет)
+        manifest = f"""<metadata>
+    <task-version>1.0</task-version>
+    <name>GitHub_Security_Pack</name>
+    <description>10 Windows Security Rules from GitHub Pipeline</description>
+    <version>1.0.0</version>
+    <author>Farhad_CyberSec</author>
+</metadata>"""
+        zf.writestr("manifest.xml", manifest)
+        
     buf.seek(0)
     data = buf.read()
-    print(f"✅ ZIP создан ({len(data)} bytes)")
+    print(f"✅ ZIP готов к деплою ({len(data)} bytes)")
     return data
 
 def upload_to_github(zip_data):
