@@ -246,13 +246,11 @@ def deploy_to_qradar(zip_data):
     """Задеплоить ZIP в QRadar"""
     print("\n⬆️  Деплоим в QRadar...")
     url = f"https://{QRADAR_IP}/api/config/extension_management/extensions"
-    upload_headers = {
-        "SEC": QRADAR_TOKEN,
-        "Version": "12.0",
-        "Accept": "application/json"
-    }
+    
+    # 1. Загрузка файла (POST)
     files = {"file": ("qradar_rules.zip", zip_data, "application/zip")}
-    r = requests.post(url, headers=upload_headers, files=files, verify=False)
+    # Мы не передаем Content-Type в заголовках здесь, requests сам выставит multipart/form-data
+    r = requests.post(url, headers=qradar_headers, files=files, verify=False)
     print(f"Upload status: {r.status_code}")
 
     if r.status_code not in [200, 201]:
@@ -262,26 +260,39 @@ def deploy_to_qradar(zip_data):
     ext_id = r.json().get("id")
     print(f"✅ Загружен ID: {ext_id}")
 
-    install_url = f"{url}/{ext_id}"
+    # 2. Установка (Активация) расширения
+    # ВАЖНО: Параметры action_type и overwrite передаем в URL
+    install_url = f"{url}/{ext_id}?action_type=INSTALL&overwrite=true"
+    
     install_headers = {
         "SEC": QRADAR_TOKEN,
         "Version": "12.0",
         "Accept": "application/json",
         "Content-Type": "application/json"
     }
+
+    # Отправляем POST с пустым телом, так как параметры уже в URL
     r = requests.post(
         install_url,
         headers=install_headers,
-        json={"action": "INSTALL", "overwrite": True},
         verify=False
     )
-    if r.status_code in [200, 201]:
-        print("✅ Extension установлен!")
+
+    if r.status_code in [200, 201, 202]:
+        print("✅ Extension успешно отправлен на установку!")
         return True
     else:
+        # Если INSTALL не прошел, пробуем UPDATE (на случай, если расширение уже есть)
+        if r.status_code == 422:
+            print("  🔄 Попытка обновления (UPDATE)...")
+            update_url = f"{url}/{ext_id}?action_type=UPDATE&overwrite=true"
+            r = requests.post(update_url, headers=install_headers, verify=False)
+            if r.status_code in [200, 201, 202]:
+                print("✅ Extension успешно обновлен!")
+                return True
+
         print(f"❌ Install failed [{r.status_code}]: {r.text[:300]}")
         return False
-
 def add_close_reasons():
     print("\n📋 Close reasons...")
     for reason in ["True-Positive", "False-Positive"]:
