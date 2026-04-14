@@ -205,25 +205,28 @@ def build_content_xml(rule, qid):
         <id>-1</id>
     </qidmap>
 </content>"""
-
 def create_zip(rules_with_qids):
     print("\n📦 Создаём правильный ZIP для QRadar...")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        # 1. Твои правила
+        # 1. Твои правила (делаем имена файлов максимально простыми)
         for i, (rule, qid) in enumerate(rules_with_qids, 1):
-            filename = f"{i:02d}_{rule['name'].replace(' ', '_')}.xml"
+            # Убираем всё кроме букв и цифр для безопасности
+            clean_name = "".join(filter(str.isalnum, rule['name']))
+            filename = f"rule_{i}_{clean_name}.xml"
+            
             zf.writestr(filename, build_content_xml(rule, qid))
-            print(f"  ✅ Добавлено в архив: {filename}")
+            print(f"  ✅ Добавлено: {filename}")
         
-        # 2. Ультра-простой МАНИФЕСТ (строгий формат для QRadar 7.5)
-        manifest = '<?xml version="1.0" encoding="UTF-8"?><metadata><task-version>1.0</task-version><name>GitHub_Rules_Pack</name><description>Windows Security Rules</description><version>1.0.0</version><author>GITHUB</author></metadata>'
+        # 2. Манифест в ОДНУ СТРОКУ (строго по стандарту 7.5)
+        # Убедись, что кавычки внутри строки одинарные или экранированы
+        manifest = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><metadata><task-version>1.0</task-version><name>GitHubRulesPack</name><description>WindowsSecurityRules</description><version>1.0.0</version><author>GITHUB</author></metadata>'
         
         zf.writestr("manifest.xml", manifest)
         
     buf.seek(0)
     data = buf.read()
-    print(f"✅ ZIP готов к деплою ({len(data)} bytes)")
+    print(f"✅ ZIP готов (размер: {len(data)})")
     return data
 def upload_to_github(zip_data):
     """Загрузить ZIP в GitHub"""
